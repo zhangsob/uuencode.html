@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head><title>UUEncode</title></head>
+<body>
+<h2 id="message"></h2>
+<label>.uue, .zip : </label>
+<input type="file" onchange="save(this.files[0])" accept=".uue, .zip"/> <a id='download'></a><br/>
+<br>
+<pre id="result"></pre>
+<script>
+var Base64 = {
+	encode : function (blob) {
+		let base = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=".split('') ;
+		let ret = "";
+
+		for(let i = 0; i < blob.length;) {
+			let chr1 = blob[i++];
+			let chr2 = blob[i++];
+			let chr3 = blob[i++];
+
+			let enc1 = chr1 >> 2;
+			let enc2 = ((chr1 & 0x03) << 4) | (chr2 >> 4);
+			let enc3 = ((chr2 & 0x0F) << 2) | (chr3 >> 6);
+			let enc4 = chr3 & 0x3F;
+
+			if (isNaN(chr2))	enc3 = 64 ;
+			if (isNaN(chr3))	enc4 = 64 ;
+
+			ret += base[enc1] + base[enc2] + base[enc3] + base[enc4] ;
+		}
+
+		return ret;
+	},
+} ;
+
+var UUEncode = {
+	base: "`!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`",
+	encode : function (blob) {
+		let b = this.base.split(''), len = blob.length, ret = b[len % 64] ;
+
+		for(let i = 0; i < len; i += 3) {
+			let enc1 = blob[i+0] >> 2;
+			let enc2 = ((blob[i+0] & 0x03) << 4) | (blob[i+1] >> 4);
+			let enc3 = ((blob[i+1] & 0x0F) << 2) | (blob[i+2] >> 6);
+			let enc4 = blob[i+2] & 0x3F;
+
+			if (isNaN(blob[i+1])) enc3 = 0;
+			if (isNaN(blob[i+2])) enc4 = 0;
+
+			ret += b[enc1] ;
+			ret += b[enc2] ;
+			ret += b[enc3] ;
+			if((i+3) % 48 == 0)	ret += '\n' ;
+			ret += b[enc4] ;
+		}
+
+		return ret.trim();
+	},
+	data : function(txt) {
+		var i = 0, ret = [] ;
+		for(var t of txt) {
+			i = this.base.indexOf(t) ;
+			if(i >= 0)	ret.push(i) ;
+		}
+		return ret ;
+	},
+	decode : function(txt) {
+		let t = this.data(txt), len = t.length, ret = new Uint8Array(Math.floor((len+3) / 4) * 3), mod = t[0], j = 0 ;
+
+		for(let i = 1; i < t.length; i += 4) {
+			ret[j++] = (t[i+0] << 2) | (t[i+1] >> 4);
+			ret[j++] = ((t[i+1] & 15) << 4) | (t[i+2] >> 2);
+			ret[j++] = ((t[i+2] & 3) << 6) | t[i+3];
+		}
+
+		return ret.subarray(0, Math.floor(j / 64) * 64 + mod) ;
+	},
+} ;
+
+function save(file) {
+	let isZip = (b) => {	return b[0] == 0x50 && b[1] == 0x4B && b[2] == 0x03 && b[3] == 0x04 ;	} ;
+
+	let setSaveFile = (id, contents, filename) => {
+		var a = document.getElementById(id) ;
+		a.setAttribute('download', filename) ;
+		a.href = 'data:application/octet-stream;base64,'+((contents instanceof Uint8Array) ? Base64.encode(contents) : btoa(contents || '')) ;
+		a.innerHTML = 'Save('+filename+')' ;
+		message.textContent = filename +' 화일 생성 (size:'+contents.length+')' ;
+	} ;
+
+	const reader = new FileReader();
+	reader.onload = (evt) => {
+		let blob = new Uint8Array(evt.target.result) ;
+
+		result.textContent = '';
+		if(isZip(blob)) {
+			setSaveFile('download', result.textContent = 'begin 644 '+file.name+'\n'+UUEncode.encode(blob)+'\n`\nend', file.name + '.uue') ;
+			return ;
+		}
+
+		let txt = '' ;
+		for(let b of blob)
+			txt += String.fromCodePoint(b) ;
+
+		let line = txt.split('\n'), len = line.length ;
+		if(len > 2
+		&& line[0].trim().indexOf("begin ") == 0
+		&& line[len-2].trim() == '`'
+		&& line[len-1].trim() == 'end') {
+			let firstLine = line[0] ;
+			let filename = firstLine.substring(firstLine.indexOf(' ', 6)).trim() ;
+			let uue = '' ;
+			for(let i = 1; i < len-2; ++i)
+				uue += line[i] ;
+
+			setSaveFile('download', UUEncode.decode(uue), filename) ;
+			result.textContent = txt;
+		}
+		else {
+			message.textContent = '.uue 화일 아님' ;
+		}
+	} ;
+	reader.readAsArrayBuffer(file);
+}
+</script>
+</body>
+</html>
