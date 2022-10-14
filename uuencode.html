@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html>
-<head><title>UUEncode</title></head>
+<head><title>UUEncode 2022-10-14</title></head>
 <body>
 <h2 id="message"></h2>
 <label>.uue, .zip : </label>
@@ -103,6 +103,10 @@ function save(file) {
 			txt += String.fromCodePoint(b) ;
 
 		let line = txt.split('\n'), len = line.length ;
+		while(line[len-1].trim().length == 0)	{
+			line.pop();	--len ;
+		}	// 마지막 LineFeed삭제하기.
+
 		if(len > 2
 		&& line[0].trim().indexOf("begin ") == 0
 		&& line[len-2].trim() == '`'
